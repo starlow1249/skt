@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+  <meta charset="UTF-8">
+  <title>כניסה עם סיסמה</title>
+  <style>
+    body { font-family: Arial; text-align: center; direction: rtl; }
+    input, button { padding: 10px; margin: 5px; }
+    #results a { display: block; margin: 10px 0; font-size: 18px; }
+  </style>
+</head>
+<body>
+  <h2>כניסה למצגות</h2>
+  <input type="password" id="password" placeholder="הכנס סיסמה"><br>
+  <input type="text" id="parasha" placeholder="הכנס שם פרשה"><br>
+  <button onclick="checkPassword()">הצג מסמכים</button>
+  <div id="results"></div>
+
+  <script>
+    const sheetId = "1YWCM1uctEsK-504WkMSdsBm5y56GBwRB3Hy_r1OYXuI"; // מזהה הגיליון שלך
+    const apiKey = "AIzaSyClmkLxcxXdKkrmGVY2fjTsVgf31RcMS_4"; // המפתח שלך
+
+    async function checkPassword() {
+      const inputPassword = document.getElementById("password").value;
+      const inputParasha = document.getElementById("parasha").value.trim();
+      const resultsDiv = document.getElementById("results");
+      resultsDiv.innerHTML = "טוען...";
+
+      try {
+        // בקשה לסיסמה
+        const passwordResponse = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/A2?key=${apiKey}`);
+        const passwordData = await passwordResponse.json();
+        const correctPassword = passwordData.values ? passwordData.values[0][0] : null;
+
+        // בדיקת סיסמה
+        if (!correctPassword || inputPassword !== correctPassword) {
+          resultsDiv.innerHTML = "סיסמה שגויה!";
+          return;
+        }
+
+        // בקשה לנתונים מתוך הגיליון (שמו של הגיליון הוא "shoket")
+        const dataResponse = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/shoket?key=${apiKey}`);
+        const data = await dataResponse.json();
+
+        // הדפסת נתוני התגובה לעזור בבדיקה
+        console.log(data);
+
+        if (!data.values || data.values.length === 0) {
+          resultsDiv.innerHTML = "לא נמצאו נתונים בגיליון.";
+          return;
+        }
+
+        const rows = data.values;
+
+        // מציאת פרשות שמתאימות לשם שנכנס
+        const matches = rows.filter(row => row[1] && row[1].trim() === inputParasha);
+
+        if (matches.length === 0) {
+          resultsDiv.innerHTML = "לא נמצאו מסמכים לפרשה הזאת.";
+          return;
+        }
+
+        // הצגת תוצאות
+        let html = "<h3>מסמכים שנמצאו:</h3>";
+        for (const row of matches) {
+          const name = row[2]; // שם המסמך
+          let link = row[3];  // הקישור של המסמך
+
+          // אם מדובר בקישור של Google Drive, להפוך אותו ל-preview
+          if (link.includes("drive.google.com/file/d/")) {
+            const idMatch = link.match(/\/d\/(.*?)\//);
+            if (idMatch && idMatch[1]) {
+              link = `https://drive.google.com/file/d/${idMatch[1]}/preview`;
+              html += `<iframe src="${link}" width="100%" height="480" style="margin-bottom: 20px;"></iframe>`;
+            } else {
+              html += `<a href="${link}" target="_blank">${name}</a>`;
+            }
+          } else {
+            html += `<a href="${link}" target="_blank">${name}</a>`;
+          }
+        }
+
+        resultsDiv.innerHTML = html;
+      } catch (error) {
+        console.error(error);
+        resultsDiv.innerHTML = "שגיאה בטעינת הנתונים.";
+      }
+    }
+  </script>
+</body>
+</html>
